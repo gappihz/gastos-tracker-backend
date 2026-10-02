@@ -1,0 +1,15 @@
+## Purpose of this BackEnd
+- [ ] Create Agent Architecture - Dual Agent - LangGraph - Autonomous
+     - [ ] First Agent - ToolStrategy Structured OutPut
+     - [ ] Second Agent - Analyze type of expenses given a certain category
+     - [ ] Async graph node
+- [ ] SQL DataBase - Neon
+    - [ ] Node - Deterministic - always fetch and check in an hourly basis
+    - [ ] Node - Retrieves Emails with subject name gastos:
+        - [ ] Get Email Body save to NeonSQL
+            - [ ] email ID
+            - [ ] body
+            - [ ] Date? (opt)
+- [ ] Second Instance or Service - ReAct Agent Financial Advisor
+    - [ ] SQL Tools
+    - [ ] Email Tools and access

@@ -1,0 +1,42 @@
+{
+  "name": "python-microservice",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22.23.1"
+    }
+  },
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "containerEnv": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "runArgs": [
+    "--env-file",
+    "${localWorkspaceFolder}/.env"
+  ],
+  "mounts": [
+    "source=dcode-state-${devcontainerId},target=/home/vscode/.deepagents/.state,type=volume"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "python.testing.pytestEnabled": true,
+        "python.analysis.typeCheckingMode": "basic"
+      }
+    }
+  },
+  "postCreateCommand": "cd '${containerWorkspaceFolder}' && sudo chown -R vscode:vscode /home/vscode/.deepagents/.state && uv sync --all-groups && python .devcontainer/configure_mcp.py && dcode --version && git --version",
+  "shutdownAction": "stopContainer"
+}

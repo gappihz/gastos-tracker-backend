@@ -1,0 +1,26 @@
+[project]
+name = "python-microservice"
+version = "0.1.0"
+description = "Python microservice"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "langchain>=1.0,<2.0",
+  "langchain-openrouter>=0.2,<1.0",
+  "langchain-openai"
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0,<9.0",
+  "ruff>=0.9,<1.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
