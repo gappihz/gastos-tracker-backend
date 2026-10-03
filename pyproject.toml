@@ -9,6 +9,8 @@ dependencies = [
   "langchain-openai",
   "python-dotenv>=1.2.4",
   "psycopg[binary]>=3.3.6",
+  "fastapi>=0.142.2",
+  "uvicorn[standard]>=0.54.0",
 ]
 
 [dependency-groups]
@@ -23,6 +25,7 @@ package = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src/gastos-tracker/backend"]
 
 [tool.ruff]
 target-version = "py312"

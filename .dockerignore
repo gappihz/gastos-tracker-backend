@@ -1,5 +1,8 @@
 .env
+.env.*
 .git
+.devcontainer/
+.vscode/
 .venv/
 __pycache__/
 .pytest_cache/

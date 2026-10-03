@@ -1,96 +1,74 @@
-# TODO:
-# - [x] IMAP Lib login and sync
-# - [x] Create functions to decipher email
-# - [x] Save Email - Make filter if email id exists
-# - [x] Save to NeonSQL
-
-import imaplib
 import email
-from email.utils import parsedate_to_datetime
+import imaplib
 import os
+from email.message import Message
+from email.utils import parsedate_to_datetime
+
 from dotenv import load_dotenv
-import psycopg
 
 load_dotenv()
 
-appPass = os.getenv('APP_PASSWORD')
-db_url = os.getenv('DATABASE_URL')
+
+def _decode_part(part: Message) -> str:
+    payload = part.get_payload(decode=True)
+    if payload is None:
+        return ""
+    return payload.decode(part.get_content_charset() or "utf-8", errors="replace")
 
 
-def fetch_existing_messages(db_url):
-    with psycopg.connect(db_url) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT messageid FROM gastostracker"
-            )
-            existing_emails = [row[0] for row in cur.fetchall()]
-    return existing_emails
+def _extract_message_body(message: Message) -> str:
+    if message.is_multipart():
+        for part in message.walk():
+            if part.get_content_type() != "text/plain":
+                continue
+            if part.get_content_disposition() == "attachment":
+                continue
+            body = _decode_part(part)
+            if body:
+                return body
+        return ""
+
+    return _decode_part(message)
 
 
-def insert_emails(db_url, emails: list):
-    rows = [
-        (
-            item['id'],
-            item['content'],
-            parsedate_to_datetime(item['date']).date()
-        )
-        for item in emails
-    ]
-    with psycopg.connect(db_url) as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                """
-                INSERT INTO gastostracker (messageid, messagebody, messagedate)
-                VALUES (%s, %s, %s)          
-                """,
-                rows,
-            )
+def fetch_emails(app_password: str | None = None) -> list[dict]:
+    """Fetch transaction emails without persisting or deduplicating them."""
+    password = app_password or os.getenv("APP_PASSWORD")
+    if not password:
+        raise RuntimeError("APP_PASSWORD is required to fetch emails.")
 
-
-def fetch_emails(appPass, existing_ids: list):
-    db_email = []
+    emails: list[dict] = []
     try:
         with imaplib.IMAP4_SSL("imap.gmail.com", 993) as mail:
-            mail.login(
-                "gappihertzd@gmail.com",
-                appPass
-            )
+            mail.login("gappihertzd@gmail.com", password)
             mail.select("INBOX")
 
             status, data = mail.search(None, "SUBJECT", "gastos")
-            message_ids = data[0].split()
+            if status != "OK":
+                raise RuntimeError("Unable to search the Gmail inbox.")
 
-            for m_id in message_ids:
-                status, msg_data = mail.fetch(m_id, "(RFC822)")
-                raw_email = msg_data[0][1]
-                message = email.message_from_bytes(raw_email)
-                body = message.get_payload(decode=True).decode(
-                    message.get_content_charset() or "utf-8",
-                    errors="replace",
-                )
-
-                m_id_m, m_date = message['Message-Id'], message['Date']
-                if m_id_m in existing_ids:
+            for message_number in data[0].split():
+                status, message_data = mail.fetch(message_number, "(RFC822)")
+                if status != "OK" or not message_data or message_data[0] is None:
                     continue
-                else:
-                    db_email.append(
-                        {
-                            "id": m_id_m,
-                            "date": m_date,
-                            "content": body,
-                        }
-                    )
 
-        return db_email
-    except Exception as e:
-        raise f'Error: {e}'
+                raw_email = message_data[0][1]
+                message = email.message_from_bytes(raw_email)
+                message_id = message.get("Message-Id")
+                message_date = message.get("Date")
+                body = _extract_message_body(message)
 
+                if not message_id or not message_date or not body:
+                    continue
 
-def main(db_url, appPass):
-    existing_emails = fetch_existing_messages(db_url=db_url)
-    emails = fetch_emails(appPass=appPass, existing_ids=existing_emails)
-    insert_emails(db_url=db_url, emails=emails)
+                emails.append(
+                    {
+                        "id": message_id,
+                        "date": parsedate_to_datetime(message_date).date(),
+                        "content": body,
+                    }
+                )
+    except imaplib.IMAP4.error as error:
+        raise RuntimeError("Unable to fetch Gmail messages.") from error
 
-
-if __name__ == "__main__":
-    main(db_url=db_url, appPass=appPass)
+    return emails

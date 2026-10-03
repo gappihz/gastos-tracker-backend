@@ -13,6 +13,10 @@ A minimal Python 3.12 microservice starter with reproducible dependencies, testi
 - Deep Agents Code with mentor, debugger, reviewer, researcher, and curriculum agents
 - prompt-kit MCP configuration and optional Context7 MCP configuration
 
+## Deploy Gastos Tracker
+
+See [the backend deployment instructions](src/gastos-tracker/backend/BACKEND_README.md#railway-deployment) for Docker, the Railway API service, hourly scheduling, and manual sync requests.
+
 ## Start a New Project
 
 Requirements: Git, Docker, VS Code, and the VS Code Dev Containers extension.
