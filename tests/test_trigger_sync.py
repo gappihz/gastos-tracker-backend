@@ -17,17 +17,18 @@ def opener(monkeypatch):
     factory = Mock(return_value=client)
     monkeypatch.setattr(trigger_sync, "build_opener", factory)
     monkeypatch.setenv("JOB_URL", JOB_URL)
-    monkeypatch.setenv("JOB_SECRET", "test-only-token")
     monkeypatch.delenv("JOB_TIMEOUT_SECONDS", raising=False)
     return client
 
 
-def test_trigger_posts_with_authentication_and_timeout(opener):
-    assert trigger_sync.trigger_sync(JOB_URL, "test-only-token", 600) == SUMMARY
+def test_trigger_posts_json_with_timeout(opener):
+    assert trigger_sync.trigger_sync(JOB_URL, 600) == SUMMARY
     request = opener.open.call_args.args[0]
     assert request.full_url == JOB_URL
     assert request.get_method() == "POST"
-    assert request.get_header("Authorization") == "Bearer test-only-token"
+    assert request.data == b"{}"
+    assert request.get_header("Content-type") == "application/json"
+    assert request.get_header("Authorization") is None
     assert opener.open.call_args.kwargs == {"timeout": 600}
     assert isinstance(trigger_sync.build_opener.call_args.args[0], trigger_sync.NoRedirectHandler)
     assert opener.open.return_value.closed
@@ -100,9 +101,8 @@ def test_invalid_timeout_is_rejected_before_network(opener, monkeypatch, capsys,
     assert "JOB_TIMEOUT_SECONDS" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("variable", ["JOB_URL", "JOB_SECRET"])
-def test_missing_configuration_is_rejected_before_network(opener, monkeypatch, variable):
-    monkeypatch.delenv(variable)
+def test_missing_job_url_is_rejected_before_network(opener, monkeypatch):
+    monkeypatch.delenv("JOB_URL")
     assert trigger_sync.main() == 1
     opener.open.assert_not_called()
 

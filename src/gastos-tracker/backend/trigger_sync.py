@@ -14,7 +14,7 @@ class NoRedirectHandler(HTTPRedirectHandler):
         return None
 
 
-def trigger_sync(job_url: str, job_secret: str, timeout_seconds: float = 1800) -> dict:
+def trigger_sync(job_url: str, timeout_seconds: float = 1800) -> dict:
     try:
         url = urlsplit(job_url)
     except ValueError:
@@ -28,16 +28,14 @@ def trigger_sync(job_url: str, job_secret: str, timeout_seconds: float = 1800) -
         or url.fragment
     ):
         raise ValueError("JOB_URL must be an HTTP or HTTPS endpoint URL without credentials.")
-    if not job_secret or "\r" in job_secret or "\n" in job_secret:
-        raise ValueError("JOB_SECRET must be configured as a nonempty, single-line token.")
     if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
         raise ValueError("JOB_TIMEOUT_SECONDS must be a positive finite number.")
 
     try:
         request = Request(
             job_url,
-            data=b"",
-            headers={"Authorization": f"Bearer {job_secret}", "Accept": "application/json"},
+            data=b"{}",
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
             method="POST",
         )
         with build_opener(NoRedirectHandler()).open(request, timeout=timeout_seconds) as response:
@@ -73,9 +71,7 @@ def main() -> int:
         return 1
 
     try:
-        result = trigger_sync(
-            os.getenv("JOB_URL", ""), os.getenv("JOB_SECRET", ""), timeout_seconds
-        )
+        result = trigger_sync(os.getenv("JOB_URL", ""), timeout_seconds)
     except (ValueError, RuntimeError) as error:
         print(json.dumps({"status": "failed", "error": str(error)}))
         return 1

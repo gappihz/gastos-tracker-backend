@@ -19,8 +19,8 @@
 Use two Railway services in the same project and environment, both built from the repository-root `Dockerfile`:
 
 ```text
-Hourly Railway cron -> authenticated POST -> API -> Gmail -> agent -> Neon
-Manual POST -------------------------------> API
+Hourly Railway cron -> POST -> API -> Gmail -> agent -> Neon
+Manual POST ---------------> API
 ```
 
 The API owns the job. The cron service only calls it and exits. Creating these files does not install a schedule; complete the Railway settings below.
@@ -42,7 +42,6 @@ Configure these Variables using raw values, without enclosing quotes:
 | `DATABASE_URL` | Neon PostgreSQL connection URL, including its SSL settings |
 | `APP_PASSWORD` | Working Gmail app password for the mailbox currently used in `email_node.py` |
 | `OPENROUTER_API_KEY` | OpenRouter API key |
-| `JOB_SECRET` | A new, long random token used only to authorize sync requests |
 | `PORT` | `8000` |
 
 The current mailbox is hardcoded in `email_node.py`; `GMAIL_ADDRESS` does not change it. This deployment does not alter the email login or transaction persistence logic. Do not upload `.env`; Railway supplies variables at runtime.
@@ -60,19 +59,18 @@ Verify `GET https://YOUR_API_DOMAIN/health` returns `{"status":"ok"}`. This is a
 
 ### 3. Test a manual sync
 
-Set `JOB_SECRET` in your local shell to the same token as the API, then call:
+Call the endpoint with any JSON body:
 
 ```bash
 curl --fail-with-body --show-error --silent \
   --request POST \
-  --header "Authorization: Bearer $JOB_SECRET" \
+  --header "Content-Type: application/json" \
+  --data '{}' \
   https://YOUR_API_DOMAIN/internal/jobs/transaction-sync
 ```
 
-No request body is required. This is a live operation: it fetches Gmail, runs the agent, and persists results in Neon. The request waits for completion and returns counts for `emails_found`, `analysis_failed`, `saved`, and `duplicates_skipped`. Check `analysis_failed` even when HTTP status is 200. Saved counts include updates to previously unprocessed rows, not just new inserts.
+This is a live operation: it fetches Gmail, runs the agent, and persists results in Neon. The request waits for completion and returns counts for `emails_found`, `analysis_failed`, `saved`, and `duplicates_skipped`. Check `analysis_failed` even when HTTP status is 200. Saved counts include updates to previously unprocessed rows, not just new inserts.
 
-- `401`: missing or incorrect bearer token.
-- `503`: `JOB_SECRET` is not configured on the API.
 - `409`: a job is already running in that API process; do not start another.
 - `500`: check the API logs; do not assume any transaction outputs were committed.
 
@@ -92,7 +90,6 @@ Set its Variables to:
 
 ```text
 JOB_URL=http://${{web.RAILWAY_PRIVATE_DOMAIN}}:${{web.PORT}}/internal/jobs/transaction-sync
-JOB_SECRET=${{web.JOB_SECRET}}
 JOB_TIMEOUT_SECONDS=1800
 ```
 
@@ -105,7 +102,7 @@ Configure:
 - Healthcheck Path: unset. This is a finite process, not an HTTP server.
 - No public domain is required for the trigger.
 
-Deploy and manually run the cron service once. Its logs should contain the same counts as the manual API request. It exits nonzero on HTTP/network errors or `analysis_failed > 0`, and logs an overlapping run as skipped. It never automatically retries and never follows redirects with the bearer token.
+Deploy and manually run the cron service once. Its logs should contain the same counts as the manual API request. It exits nonzero on HTTP/network errors or `analysis_failed > 0`, and logs an overlapping run as skipped. It never automatically retries and never follows redirects.
 
 Railway skips a scheduled invocation if its previous cron process is still running. Private HTTP avoids the public proxy inactivity limit; the trigger also has a configurable request timeout. Private networking must be in the same project/environment. The image listens on IPv4; legacy IPv6-only Railway environments need an IPv4-capable environment or a different network/bind configuration.
 

@@ -1,11 +1,9 @@
-import os
-import secrets
 from functools import lru_cache
 from threading import Lock
-from typing import Annotated
+from typing import Annotated, Any
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Body, Depends, FastAPI, HTTPException, status
 from nodes.transaction_analysis_agent import TransactionAgent
 from nodes.transaction_repository import TransactionRepository
 from nodes.transaction_sync_job import JobAlreadyRunningError, TransactionSyncJob
@@ -29,24 +27,6 @@ def get_transaction_sync_job() -> TransactionSyncJob:
         return _create_transaction_sync_job()
 
 
-def verify_job_secret(
-    authorization: Annotated[str | None, Header()] = None,
-) -> None:
-    expected_secret = os.getenv("JOB_SECRET")
-    if not expected_secret:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="JOB_SECRET is not configured.",
-        )
-
-    expected_header = f"Bearer {expected_secret}"
-    if authorization is None or not secrets.compare_digest(authorization, expected_header):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid job authorization.",
-        )
-
-
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -54,8 +34,8 @@ def health() -> dict:
 
 @app.post("/internal/jobs/transaction-sync")
 async def run_transaction_sync(
-    _: Annotated[None, Depends(verify_job_secret)],
     job: Annotated[TransactionSyncJob, Depends(get_transaction_sync_job)],
+    _payload: Annotated[Any, Body()] = None,
 ) -> dict:
     try:
         return await job.run()
