@@ -17,10 +17,11 @@ class TransactionAgent:
     def __init__(self) -> None:
         api_key = os.getenv("OPENROUTER_API_KEY")
         if not api_key:
-            raise RuntimeError("OPENROUTER_API_KEY is required to analyze transactions.")
+            raise RuntimeError(
+                "OPENROUTER_API_KEY is required to analyze transactions.")
 
         llm = ChatOpenRouter(
-            model="deepseek/deepseek-v4-flash-0731",
+            model="deepseek/deepseek-v4-flash",
             api_key=api_key,
             max_tokens=800,
             temperature=0,
@@ -60,7 +61,8 @@ class TransactionAgent:
 
         semaphore = asyncio.Semaphore(max_concurrency)
         outcomes = await asyncio.gather(
-            *(self.analyze_one(email_record, semaphore) for email_record in email_records),
+            *(self.analyze_one(email_record, semaphore)
+              for email_record in email_records),
             return_exceptions=True,
         )
 
